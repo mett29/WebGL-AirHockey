@@ -1,0 +1,52 @@
+<html>
+
+	<head>
+	<meta charset='utf-8'>
+	<title>Air Hockey</title>
+	<script type="text/javascript" src="utils.js"></script>
+	<script type="text/javascript" src="drawing.js"></script>
+	</head>
+
+	<body onLoad="main();">
+		<table>
+		<tr>
+			<td>
+			<canvas id="c" width="1000" height="600">
+			Your browser does not support the HTML5 canvas element.
+			</canvas>		
+			</td>
+			<td style="background-color: white; font-family: courier; padding: 5px;">
+			<p><h2> Options </h2></p>
+			<p><b> Light Source </b></p>
+			<form>
+				<input type="radio" name="light" id="yesl" onchange="updateLightType(this.value);" value="1" checked> Directional <br/>
+				<input type="radio" name="light" onchange="updateLightType(this.value);" value="2" > Point <br/>
+				<input type="radio" name="light" onchange="updateLightType(this.value);" value="3" > Point w. Decay <br/>
+				<input type="radio" name="light" onchange="updateLightType(this.value);" value="4" > Spot <br/>
+				<input type="radio" name="light" id="nol" onchange="updateLightType(this.value);" value="5" > [NO Light] <br/>
+			</form>
+			<p><b> Light Computation </b></p>
+			<form>
+				<input type="radio" name="type" onchange="updateShader(this.value);" value="1" > Per Vertex <br/>
+				<input type="radio" name="type" onchange="updateShader(this.value);" value="0" checked> Per Fragment <br/>
+			</form>			
+			<p><b> Texture Influence </b></p>
+			<div id="slider1"> 0 
+				<input id="slide1" type="range" min="0" max="1" step="0.1" value="1" onchange="updateTextureInfluence(this.value);"/> 1 <br/>	
+			</div>	
+			<p><b> Ambient Light Influence </b></p>
+			<div id="slider1">	0
+				<input id="slide2" type="range" min="0" max="1" step="0.1" value="0" onchange="updateAmbientLightInfluence(this.value);"/> 1 <br/>					
+				<p><b>  Ambient Light Color </b></p>
+				<p>
+				<input id="colorPicker" type="color" value="#FFFFFF" onchange="updateAmbientLightColor(this.value);"/>
+				</p>
+			</div>
+			
+			<p><b> Movement </b></p>
+				<input type="checkbox" id="chbx" onclick="updateLightMovement();"/> Move Lights<br/>
+			</td>
+		<tr>
+		</table>
+	</body>
+</html>
