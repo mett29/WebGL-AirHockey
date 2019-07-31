@@ -5,18 +5,42 @@
 	<title>Air Hockey</title>
 	<script type="text/javascript" src="utils.js"></script>
 	<script type="text/javascript" src="drawing.js"></script>
+
+	<style>
+		/* remove the border */
+		body {
+			border: 0;
+			background-color: white;
+		}
+		/* make the canvas the size of the viewport */
+		canvas {
+			width: 80%;
+			height: 100%;
+		}
+		#options {
+			float: left;
+		}
+	</style>
+
 	</head>
 
 	<body onLoad="main();">
-		<table>
-		<tr>
-			<td>
-			<canvas id="c" width="1000" height="600">
+
+		<canvas id="c">
 			Your browser does not support the HTML5 canvas element.
-			</canvas>		
-			</td>
+		</canvas>
+
+		<table id="options">
+		<tr>
 			<td style="background-color: white; font-family: courier; padding: 5px;">
 			<p><h2> Options </h2></p>
+			<p><b> Camera </b></p>
+			<form>
+				<select name="camera" onchange="updateCamera(this.value);">
+					<option value="FRONT">FRONT</option>
+					<option value="SIDE">SIDE</option>
+				</select>
+			</form>
 			<p><b> Light Source </b></p>
 			<form>
 				<input type="radio" name="light" id="yesl" onchange="updateLightType(this.value);" value="1" checked> Directional <br/>

@@ -70,6 +70,8 @@ var delta = 2.0;
 var hx = 0.0;
 var hy = 0.0;
 var hz = 0.0;
+var speedHandleLeftRight = 0.02;
+var speedHandleUpDown = 0.04;
 
 // Eye parameters;
 // We need now 4 eye vector, one for each cube
@@ -100,10 +102,10 @@ function main(){
 		// and other useful parameters
 		var w = canvas.clientWidth;
 		var h = canvas.clientHeight;
-		gl.clearColor(1.0, 1.0, 1.0, 1.0);
+		gl.clearColor(0.9, 0.9, 0.9, 0);
 		gl.viewport(0.0, 0.0, w, h);
 		gl.enable(gl.DEPTH_TEST);
-		perspectiveMatrix = utils.MakePerspective(10, w/h, 0.1, 100.0);
+		perspectiveMatrix = utils.MakePerspective(12, w/h, 0.1, 100.0);
 
 		// Open the json file containing the 3D model to load,
 		// parse it to retreive objects' data
@@ -129,6 +131,24 @@ function main(){
 	
 }
 
+// Update camera (FRONT, TOP, SIDE)
+function updateCamera(val) {
+	if (val == "FRONT") {
+		for (i = 0; i < sceneObjects; i++) {
+			objectWorldMatrix[i] = utils.multiplyMatrices(
+				objectWorldMatrix[i],
+				utils.MakeRotateYMatrix(90));	
+		}
+	}
+	if (val == "SIDE") {
+		for (i = 0; i < sceneObjects; i++) {
+			objectWorldMatrix[i] = utils.multiplyMatrices(
+				objectWorldMatrix[i],
+				utils.MakeRotateYMatrix(-90));	
+		}
+	}
+}
+
 // Called when the slider for texture influence is changed
 function updateTextureInfluence(val) {
 	textureInfluence = val;
@@ -139,11 +159,11 @@ function updateLightType(val) {
 }
 
 function updateLightMovement() {
-	    if (checkbox.checked == true) {
-            moveLight = 1;
-        } else {
-            moveLight = 0;
-        }
+	if (checkbox.checked == true) {
+		moveLight = 1;
+	} else {
+		moveLight = 0;
+	}
 }
 
 function updateShader(val) {
@@ -162,7 +182,7 @@ function updateAmbientLightColor(val) {
 	ambientLightColor[3] = 1.0;
 }
 
-function loadShaders(){
+function loadShaders() {
 		
 		utils.loadFiles([shaderDir + 'vs_p.glsl',
 						 shaderDir + 'fs_p.glsl',
@@ -365,77 +385,100 @@ function loadModel(modelName) {
 					// Creating the objects' world matrix
 					objectWorldMatrix[i] = loadedModel.rootnode.children[i].transformation;
 					
-					// Correcting the orientation
+					// Correcting the orientation 
 					objectWorldMatrix[i] = utils.multiplyMatrices(
 											objectWorldMatrix[i],
-											utils.MakeRotateYMatrix(-108));	
+											utils.MakeRotateYMatrix(-109));	
 
 					objectWorldMatrix[i] = utils.multiplyMatrices(
 											objectWorldMatrix[i],
-											utils.MakeRotateZMatrix(-5));
+											utils.MakeRotateZMatrix(-8));
 					
 					objectWorldMatrix[i] = utils.multiplyMatrices(
 											objectWorldMatrix[i],
 											utils.MakeTranslateMatrix(0, 0, -2.5));
+				}
 
+				// Scale Paddles and Puck
+				for (i = 0; i < sceneObjects - 1; i++) {
 					objectWorldMatrix[i] = utils.multiplyMatrices(
-											objectWorldMatrix[i],
-											utils.MakeScaleMatrix(scaleValue));
-				} 
+						objectWorldMatrix[i],
+						utils.MakeScaleMatrix(scaleValue - 1.5));
+				}
+				// Scale Table
+				objectWorldMatrix[3] = utils.multiplyMatrices(
+					objectWorldMatrix[i],
+					utils.MakeScaleMatrix(scaleValue));
 			});
 }
 
+var pressed = true; // Used to move the paddles
+
 function initInteraction() {
 
-		var keyFunction = function(e) {
-			if (e.keyCode == 37) {	// Left arrow
-				if (moveLight == 0) cx -= delta;
-				else lightPosition[0] -= delta;
-			}
-			if (e.keyCode == 39) {	// Right arrow
-				if (moveLight == 0)cx  += delta;
-				else lightPosition[0] += delta;
-			}	
-			if (e.keyCode == 38) {	// Up arrow
-				if (moveLight == 0)  cz -= delta;
-				else lightPosition[2] -= delta;
-			}
-			if (e.keyCode == 40) {	// Down arrow
-				if (moveLight == 0)  cz += delta;
-				else lightPosition[2] += delta;
-			}
-			if (e.keyCode == 107) {	// Add
-				if (moveLight == 0)  cy += delta;
-				else lightPosition[1] += delta;
-			}
-			if (e.keyCode == 109) {	// Subtract
-				if (moveLight == 0)  cy -= delta;
-				else lightPosition[1] -= delta;
-			}
-			
-			if (e.keyCode == 65) {	// a
-				
-			}
-			if (e.keyCode == 68) {	// d
-				
-			}	
-			if (e.keyCode == 87) {	// w
-				console.log(hx);
-				hx += 0.1;
-				objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx, hy, hz));
-			}
-			if (e.keyCode == 83) {	// s
-				
-			}
-		//console.log(" ("+cx + "/" + cy + "/" + cz + ") - "+ elevation + "." + angle);	
+	var keyFunction = function(e) {
+		
+		if (e.keyCode == 37) {	// Left arrow
+			if (moveLight == 0) cx -= delta;
+			else lightPosition[0] -= delta;
+		}
+		if (e.keyCode == 39) {	// Right arrow
+			if (moveLight == 0) cx  += delta;
+			else lightPosition[0] += delta;
+		}	
+		if (e.keyCode == 38) {	// Up arrow
+			if (moveLight == 0)  cz -= delta;
+			else lightPosition[2] -= delta;
+		}
+		if (e.keyCode == 40) {	// Down arrow
+			if (moveLight == 0)  cz += delta;
+			else lightPosition[2] += delta;
+		}
+		if (e.keyCode == 90) {	// Z
+			if (moveLight == 0)  cy += delta;
+			else lightPosition[1] += delta;
+		}
+		if (e.keyCode == 88) {	// X
+			if (moveLight == 0)  cy -= delta;
+			else lightPosition[1] -= delta;
 		}
 		
-		// 'window' is a JavaScript object (if "canvas", it will not work)
-		window.addEventListener("keyup", keyFunction, false);
+		if (e.keyCode == 65) {	// a
+			resetValues();
+			hz -= speedHandleLeftRight;
+		}
+		if (e.keyCode == 68) {	// d
+			resetValues();
+			hz += speedHandleLeftRight;
+		}	
+		if (e.keyCode == 87) {	// w
+			resetValues();
+			hx += speedHandleUpDown;
+		}
+		if (e.keyCode == 83) {	// s
+			resetValues();
+			hx -= speedHandleUpDown;
+		}
+	//console.log(" ("+cx + "/" + cy + "/" + cz + ") - "+ elevation + "." + angle);	
 	}
+		
+	window.addEventListener("keydown", keyFunction, false);
+
+	window.addEventListener('keyup', function(e) {
+		pressed = false;
+	});
+}
+
+function resetValues() { // In this way I do not have to press the keys twice in order to change direction
+	pressed = true;
+	hx = 0;
+	hy = 0;
+	hz = 0;
+}
 
 
 function computeMatrices() {
+
 	viewMatrix = utils.MakeView(cx, cy, cz, elevation, angle);
 	
 	var eyeTemp = [cx, cy, cz];
@@ -453,18 +496,26 @@ function computeMatrices() {
 }
 
 function animate() {
-    var currentTime = (new Date).getTime();
+	//var currentTime = (new Date).getTime();
+	
     /*if (lastUpdateTime) {
       var deltaC = (30 * (currentTime - lastUpdateTime)) / 1000.0;
       hx += deltaC;
       hy -= deltaC;
       hz += deltaC;    
 	}*/
-    //objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx, hy, hz));
-    lastUpdateTime = currentTime;               
-  }
+
+	//lastUpdateTime = currentTime;    
+	
+	if (pressed) {
+		objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx, hy, hz));
+	}
+
+}
 	
 function drawScene() {
+
+		utils.resizeCanvasToDisplaySize(gl.canvas);
 
 		animate();
 		
@@ -474,7 +525,7 @@ function drawScene() {
 		
 		gl.useProgram(shaderProgram[currentShader]);
 		
-		for (i = 0; i < sceneObjects; i++){
+		for (i = 0; i < sceneObjects; i++) {
 			gl.uniformMatrix4fv(matrixPositionHandle[currentShader], gl.FALSE, utils.transposeMatrix(projectionMatrix[i]));		
 			
 			gl.uniform1f(textureInfluenceHandle[currentShader], textureInfluence);
