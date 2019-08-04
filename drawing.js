@@ -62,7 +62,7 @@ var cx = 10.0;
 var cy = 13.0;
 var cz = 36.0;
 var elevation = -20.0;
-var angle = -20.0;
+var angle = -16.0;
 
 var delta = 2.0;
 
@@ -86,7 +86,7 @@ var textureInfluence = 1.0;
 var ambientLightInfluence = 0.0;
 var ambientLightColor = [1.0, 1.0, 1.0, 1.0];
 
-function main(){
+function main() {
 
 	canvas = document.getElementById("c");
 	checkbox = document.getElementById("chbx");
@@ -124,6 +124,9 @@ function main(){
 		// Rendering cycle
 		drawScene();
 
+		// Setup slider
+		webglLessonsUI.setupSlider("#cameraAngle", {value: cameraAngleDeg, slide: updateCameraAngle, min: -180, max: 180});
+
 		
 	} else {
 		alert("Error: Your browser does not appear to support WebGL.");
@@ -131,21 +134,24 @@ function main(){
 	
 }
 
-// Update camera (FRONT, TOP, SIDE)
-function updateCamera(val) {
-	if (val == "FRONT") {
-		for (i = 0; i < sceneObjects; i++) {
-			objectWorldMatrix[i] = utils.multiplyMatrices(
-				objectWorldMatrix[i],
-				utils.MakeRotateYMatrix(90));	
-		}
+var cameraAngleDeg = 0;
+
+// Function for the slider
+function updateCameraAngle(event, ui) {
+	cameraAngleDeg = (ui.value);
+	for (i = 0; i < sceneObjects; i++) {
+		objectWorldMatrix[i] = utils.multiplyMatrices(
+			objectWorldMatrix[i],
+			utils.MakeRotateYMatrix(cameraAngleDeg));
 	}
-	if (val == "SIDE") {
-		for (i = 0; i < sceneObjects; i++) {
-			objectWorldMatrix[i] = utils.multiplyMatrices(
-				objectWorldMatrix[i],
-				utils.MakeRotateYMatrix(-90));	
-		}
+}
+
+// Rotate camera by 90°
+function updateCamera() {
+	for (i = 0; i < sceneObjects; i++) {
+		objectWorldMatrix[i] = utils.multiplyMatrices(
+			objectWorldMatrix[i],
+			utils.MakeRotateYMatrix(90));	
 	}
 }
 
@@ -184,232 +190,241 @@ function updateAmbientLightColor(val) {
 
 function loadShaders() {
 		
-		utils.loadFiles([shaderDir + 'vs_p.glsl',
-						 shaderDir + 'fs_p.glsl',
-						 shaderDir + 'vs_g.glsl',
-						 shaderDir + 'fs_g.glsl'
-						 ], 
-						 function(shaderText){
-							// odd numbers are VSs, even are FSs
-							var numShader = 0;
-							for (i = 0; i < shaderText.length; i += 2) {
-								var vertexShader = gl.createShader(gl.VERTEX_SHADER);
-								gl.shaderSource(vertexShader, shaderText[i]);
-								gl.compileShader(vertexShader);
-								if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
-									alert("ERROR IN VS SHADER : "+gl.getShaderInfoLog(vertexShader));
-								}
-								var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-								gl.shaderSource(fragmentShader, shaderText[i+1]);
-								gl.compileShader(fragmentShader);
-								if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
-									alert("ERROR IN FS SHADER : "+gl.getShaderInfoLog(fragmentShader));
-								}
-								shaderProgram[numShader] = gl.createProgram();
-								gl.attachShader(shaderProgram[numShader], vertexShader);
-								gl.attachShader(shaderProgram[numShader], fragmentShader);
-								gl.linkProgram(shaderProgram[numShader]);
-								if (!gl.getProgramParameter(shaderProgram[numShader], gl.LINK_STATUS)) {
-									alert("Unable to initialize the shader program...");
-								}
-								numShader++;
-							}	
-						});
+	utils.loadFiles([shaderDir + 'vs_p.glsl',
+					shaderDir + 'fs_p.glsl',
+					shaderDir + 'vs_g.glsl',
+					shaderDir + 'fs_g.glsl'
+					], 
+					function(shaderText){
+					// odd numbers are VSs, even are FSs
+					var numShader = 0;
+					for (i = 0; i < shaderText.length; i += 2) {
+						var vertexShader = gl.createShader(gl.VERTEX_SHADER);
+						gl.shaderSource(vertexShader, shaderText[i]);
+						gl.compileShader(vertexShader);
+						if (!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS)) {
+							alert("ERROR IN VS SHADER : "+gl.getShaderInfoLog(vertexShader));
+						}
+						var fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+						gl.shaderSource(fragmentShader, shaderText[i+1]);
+						gl.compileShader(fragmentShader);
+						if (!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS)) {
+							alert("ERROR IN FS SHADER : "+gl.getShaderInfoLog(fragmentShader));
+						}
+						shaderProgram[numShader] = gl.createProgram();
+						gl.attachShader(shaderProgram[numShader], vertexShader);
+						gl.attachShader(shaderProgram[numShader], fragmentShader);
+						gl.linkProgram(shaderProgram[numShader]);
+						if (!gl.getProgramParameter(shaderProgram[numShader], gl.LINK_STATUS)) {
+							alert("Unable to initialize the shader program...");
+						}
+						numShader++;
+					}	
+	});
 			
-		// Getting the handles to the shaders' vars
+	// Getting the handles to the shaders' vars
+	
+	for (i = 0; i < 2; i++) {
+		vertexPositionHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inPosition');
+		vertexNormalHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inNormal');
+		vertexUVHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inUVs');
 		
-		for (i = 0; i < 2; i++) {
-			vertexPositionHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inPosition');
-			vertexNormalHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inNormal');
-			vertexUVHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inUVs');
-			
-			matrixPositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'wvpMatrix');
-			
-			materialDiffColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mDiffColor');
-			materialSpecColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mSpecColor');
-			materialSpecPowerHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mSpecPower');
-			textureFileHandle[i] = gl.getUniformLocation(shaderProgram[i], 'textureFile');
+		matrixPositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'wvpMatrix');
+		
+		materialDiffColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mDiffColor');
+		materialSpecColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mSpecColor');
+		materialSpecPowerHandle[i] = gl.getUniformLocation(shaderProgram[i], 'mSpecPower');
+		textureFileHandle[i] = gl.getUniformLocation(shaderProgram[i], 'textureFile');
 
-			textureInfluenceHandle[i] = gl.getUniformLocation(shaderProgram[i], 'textureInfluence');
-			ambientLightInfluenceHandle[i] = gl.getUniformLocation(shaderProgram[i], 'ambientLightInfluence');
-			ambientLightColorHandle[i]= gl.getUniformLocation(shaderProgram[i], 'ambientLightColor');
-			
-			eyePositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'eyePosition');
-			
-			lightDirectionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightDirection');
-			lightPositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightPosition');
-			lightColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightColor');
-			lightTypeHandle[i]= gl.getUniformLocation(shaderProgram[i],'lightType');		
-		}
+		textureInfluenceHandle[i] = gl.getUniformLocation(shaderProgram[i], 'textureInfluence');
+		ambientLightInfluenceHandle[i] = gl.getUniformLocation(shaderProgram[i], 'ambientLightInfluence');
+		ambientLightColorHandle[i]= gl.getUniformLocation(shaderProgram[i], 'ambientLightColor');
+		
+		eyePositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'eyePosition');
+		
+		lightDirectionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightDirection');
+		lightPositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightPosition');
+		lightColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightColor');
+		lightTypeHandle[i]= gl.getUniformLocation(shaderProgram[i],'lightType');		
+	}
 }
 
 
 function loadModel(modelName) {
 
-		utils.get_json(modelsDir + modelName, function(loadedModel) {
-				
-			sceneObjects = loadedModel.meshes.length;
-				
-				console.log("Found " + sceneObjects + " objects...");
-				
-				// Preparing to store objects' world matrix and the lights and material properties per object 
-				for (i = 0; i < sceneObjects; i++) {
-					objectWorldMatrix[i] = new utils.identityMatrix();
-					projectionMatrix[i] =  new utils.identityMatrix();
-					diffuseColor[i] = [1.0, 1.0, 1.0, 1.0];	
-					specularColor[i] = [1.0, 1.0, 1.0, 1.0];	
-					observerPositionObj[i] = new Array(3);		
-					lightDirectionObj[i] = new Array(3);
-					lightPositionObj[i]	= new Array(3);				
+	utils.get_json(modelsDir + modelName, function(loadedModel) {
+			
+		sceneObjects = loadedModel.meshes.length;
+			
+		console.log("Found " + sceneObjects + " objects...");
+		
+		// Preparing to store objects' world matrix and the lights and material properties per object 
+		for (i = 0; i < sceneObjects; i++) {
+			objectWorldMatrix[i] = new utils.identityMatrix();
+			projectionMatrix[i] =  new utils.identityMatrix();
+			diffuseColor[i] = [1.0, 1.0, 1.0, 1.0];	
+			specularColor[i] = [1.0, 1.0, 1.0, 1.0];	
+			observerPositionObj[i] = new Array(3);		
+			lightDirectionObj[i] = new Array(3);
+			lightPositionObj[i]	= new Array(3);				
+		}
+		
+		for (i = 0; i < sceneObjects; i++) { 
+			
+			// Creating the vertex data
+			console.log("Object[" + i + "]:");
+			console.log("MeshName: "+ loadedModel.rootnode.children[i].name);
+			console.log("Vertices: "+ loadedModel.meshes[i].vertices.length);			
+			console.log("Normals: "+ loadedModel.meshes[i].normals.length);		
+			if (loadedModel.meshes[i].texturecoords){
+				console.log("UVss: " + loadedModel.meshes[i].texturecoords[0].length);
+			} else {
+				console.log("No UVs for this mesh!");
+			}
+
+			var meshMatIndex = loadedModel.meshes[i].materialindex;
+			
+			var UVFileNamePropertyIndex = -1;
+			var diffuseColorPropertyIndex = -1;
+			var specularColorPropertyIndex = -1;
+			for (n = 0; n < loadedModel.materials[meshMatIndex].properties.length; n++){
+				if(loadedModel.materials[meshMatIndex].properties[n].key == "$tex.file") UVFileNamePropertyIndex = n;
+				if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.diffuse") diffuseColorPropertyIndex = n;
+				if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.specular") specularColorPropertyIndex = n;
+			}
+
+			
+			// Getting vertex and normals					
+			var objVertex = [];		
+			for (n = 0; n < loadedModel.meshes[i].vertices.length/3; n++){
+				objVertex.push(loadedModel.meshes[i].vertices[n*3], 
+								loadedModel.meshes[i].vertices[n*3+1],
+								loadedModel.meshes[i].vertices[n*3+2]);
+				objVertex.push(loadedModel.meshes[i].normals[n*3], 
+								loadedModel.meshes[i].normals[n*3+1],
+								loadedModel.meshes[i].normals[n*3+2]);									   
+				if (UVFileNamePropertyIndex >= 0) { // True if a texture is present
+					objVertex.push( loadedModel.meshes[i].texturecoords[0][n*2],
+									loadedModel.meshes[i].texturecoords[0][n*2+1]);
+				} else {
+					objVertex.push(0.0, 0.0);
 				}
+			}
+			
+			facesNumber[i] = loadedModel.meshes[i].faces.length;
+			console.log("Face Number: " + facesNumber[i]);
+			
+			s = 0;		
+			
+			if (UVFileNamePropertyIndex >= 0) {
 				
-				for (i = 0; i < sceneObjects; i++) { 
-					
-					// Creating the vertex data
-					console.log("Object[" + i + "]:");
-					console.log("MeshName: "+ loadedModel.rootnode.children[i].name);
-					console.log("Vertices: "+ loadedModel.meshes[i].vertices.length);			
-					console.log("Normals: "+ loadedModel.meshes[i].normals.length);		
-					if (loadedModel.meshes[i].texturecoords){
-						console.log("UVss: " + loadedModel.meshes[i].texturecoords[0].length);
-					} else {
-						console.log("No UVs for this mesh!");
-					}
+				nTexture[i] = true;
+				
+				console.log(loadedModel.materials[meshMatIndex].properties[UVFileNamePropertyIndex].value);
+				// In our case 'airhockey-background.png'
+				var imageName = loadedModel.materials[meshMatIndex].properties[UVFileNamePropertyIndex].value;
+				
+				var getTexture = function(image_URL) {
+					var image = new Image();
+					image.webglTexture=false;
+				
+					requestCORSIfNotSameOrigin(image, image_URL);
 
-					var meshMatIndex = loadedModel.meshes[i].materialindex;
-					
-					var UVFileNamePropertyIndex = -1;
-					var diffuseColorPropertyIndex = -1;
-					var specularColorPropertyIndex = -1;
-					for (n = 0; n < loadedModel.materials[meshMatIndex].properties.length; n++){
-						if(loadedModel.materials[meshMatIndex].properties[n].key == "$tex.file") UVFileNamePropertyIndex = n;
-						if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.diffuse") diffuseColorPropertyIndex = n;
-						if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.specular") specularColorPropertyIndex = n;
-					}
+					image.onload = function(e) {
 
-					
-					// Getting vertex and normals					
-					var objVertex = [];		
-					for (n = 0; n < loadedModel.meshes[i].vertices.length/3; n++){
-						objVertex.push(loadedModel.meshes[i].vertices[n*3], 
-									   loadedModel.meshes[i].vertices[n*3+1],
-									   loadedModel.meshes[i].vertices[n*3+2]);
-						objVertex.push(loadedModel.meshes[i].normals[n*3], 
-									   loadedModel.meshes[i].normals[n*3+1],
-									   loadedModel.meshes[i].normals[n*3+2]);									   
-						if (UVFileNamePropertyIndex >= 0) { // True if a texture is present
-							objVertex.push( loadedModel.meshes[i].texturecoords[0][n*2],
-											loadedModel.meshes[i].texturecoords[0][n*2+1]);
-						} else {
-							objVertex.push( 0.0, 0.0);
-						}
-					}
-					
-					facesNumber[i] = loadedModel.meshes[i].faces.length;
-					console.log("Face Number: " + facesNumber[i]);
-					
-					s = 0;		
-					
-					if (UVFileNamePropertyIndex >= 0) {
+						var texture = gl.createTexture();
 						
-						nTexture[i] = true;
+						gl.bindTexture(gl.TEXTURE_2D, texture);
 						
-						console.log(loadedModel.materials[meshMatIndex].properties[UVFileNamePropertyIndex].value);
-						// In our case 'airhockey-background.png'
-						var imageName = loadedModel.materials[meshMatIndex].properties[UVFileNamePropertyIndex].value;
+						gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+						gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+						gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+						gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+						gl.generateMipmap(gl.TEXTURE_2D);
 						
-						var getTexture = function(image_URL) {
-							var image = new Image();
-							image.webglTexture=false;
-  						
-						  	requestCORSIfNotSameOrigin(image, image_URL);
-
-							image.onload = function(e) {
-
-								var texture = gl.createTexture();
-								
-								gl.bindTexture(gl.TEXTURE_2D, texture);
-								
-								gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-								gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-								gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-								gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-								gl.generateMipmap(gl.TEXTURE_2D);
-								
-								gl.bindTexture(gl.TEXTURE_2D, null);
-								image.webglTexture = texture;
-							};
-							
-							image.src=image_URL;
-
-							return image;
-						};
-							
-						diffuseTextureObj[i] = getTexture(modelsDir + imageName);
-
-						console.log("TXT filename: " + diffuseTextureObj[i]);
-						console.log("TXT src: " + diffuseTextureObj[i].src);
-						console.log("TXT loaded?: " + diffuseTextureObj[i].webglTexture);
+						gl.bindTexture(gl.TEXTURE_2D, null);
+						image.webglTexture = texture;
+					};
 					
-					} else { 
-						nTexture[i] = false;
-					}
-					
-					// Mesh color
-					diffuseColor[i] = loadedModel.materials[meshMatIndex].properties[diffuseColorPropertyIndex].value; // Diffuse value
-				
-					diffuseColor[i].push(1.0); // Alpha value added
-					
-					specularColor[i] = loadedModel.materials[meshMatIndex].properties[specularColorPropertyIndex].value;
-					console.log("Specular: " + specularColor[i]);
-				
-					// Vertices, normals and UV set 1
-					vertexBufferObjectId[i] = gl.createBuffer();
-					gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferObjectId[i]);
-					gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(objVertex), gl.STATIC_DRAW);
-							 
-					// Creating index buffer
-					facesData = [];				 
-					for (n = 0; n < loadedModel.meshes[i].faces.length; n++) {
-						facesData.push( loadedModel.meshes[i].faces[n][0],
-										loadedModel.meshes[i].faces[n][1],
-										loadedModel.meshes[i].faces[n][2]
-										);
-					}
-					
-					indexBufferObjectId[i] = gl.createBuffer ();
-					gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferObjectId[i]);
-					gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(facesData),gl.STATIC_DRAW);
-							  
-				
-					// Creating the objects' world matrix
-					objectWorldMatrix[i] = loadedModel.rootnode.children[i].transformation;
-					
-					// Correcting the orientation 
-					objectWorldMatrix[i] = utils.multiplyMatrices(
-											objectWorldMatrix[i],
-											utils.MakeRotateYMatrix(-109));	
+					image.src=image_URL;
 
-					objectWorldMatrix[i] = utils.multiplyMatrices(
-											objectWorldMatrix[i],
-											utils.MakeRotateZMatrix(-8));
+					return image;
+				};
 					
-					objectWorldMatrix[i] = utils.multiplyMatrices(
-											objectWorldMatrix[i],
-											utils.MakeTranslateMatrix(0, 0, -2.5));
-				}
+				diffuseTextureObj[i] = getTexture(modelsDir + imageName);
 
-				// Scale Paddles and Puck
-				for (i = 0; i < sceneObjects - 1; i++) {
-					objectWorldMatrix[i] = utils.multiplyMatrices(
-						objectWorldMatrix[i],
-						utils.MakeScaleMatrix(scaleValue - 1.5));
-				}
-				// Scale Table
-				objectWorldMatrix[3] = utils.multiplyMatrices(
-					objectWorldMatrix[i],
-					utils.MakeScaleMatrix(scaleValue));
-			});
+				console.log("TXT filename: " + diffuseTextureObj[i]);
+				console.log("TXT src: " + diffuseTextureObj[i].src);
+				console.log("TXT loaded?: " + diffuseTextureObj[i].webglTexture);
+			
+			} else { 
+				nTexture[i] = false;
+			}
+			
+			// Mesh color
+			diffuseColor[i] = loadedModel.materials[meshMatIndex].properties[diffuseColorPropertyIndex].value; // Diffuse value
+		
+			diffuseColor[i].push(1.0); // Alpha value added
+			
+			specularColor[i] = loadedModel.materials[meshMatIndex].properties[specularColorPropertyIndex].value;
+			console.log("Specular: " + specularColor[i]);
+		
+			// Vertices, normals and UV set 1
+			vertexBufferObjectId[i] = gl.createBuffer();
+			gl.bindBuffer(gl.ARRAY_BUFFER, vertexBufferObjectId[i]);
+			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(objVertex), gl.STATIC_DRAW);
+						
+			// Creating index buffer
+			facesData = [];				 
+			for (n = 0; n < loadedModel.meshes[i].faces.length; n++) {
+				facesData.push( loadedModel.meshes[i].faces[n][0],
+								loadedModel.meshes[i].faces[n][1],
+								loadedModel.meshes[i].faces[n][2]
+								);
+			}
+			
+			indexBufferObjectId[i] = gl.createBuffer ();
+			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferObjectId[i]);
+			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(facesData),gl.STATIC_DRAW);
+						
+		
+			// Creating the objects' world matrix
+			objectWorldMatrix[i] = loadedModel.rootnode.children[i].transformation;
+
+			// Correcting the orientation 
+			//correctOrientation();
+		}
+
+		// Scale the objects
+		scaleObjects();
+	});
+}
+
+function correctOrientation() {
+	objectWorldMatrix[i] = utils.multiplyMatrices(
+		objectWorldMatrix[i],
+		utils.MakeRotateYMatrix(-109));	
+
+	objectWorldMatrix[i] = utils.multiplyMatrices(
+			objectWorldMatrix[i],
+			utils.MakeRotateZMatrix(-8));
+
+	objectWorldMatrix[i] = utils.multiplyMatrices(
+		objectWorldMatrix[i],
+		utils.MakeTranslateMatrix(0, 0, -2.5));
+}
+
+function scaleObjects() {
+	// Scale Paddles and Puck
+	for (i = 0; i < sceneObjects - 1; i++) {
+		objectWorldMatrix[i] = utils.multiplyMatrices(
+			objectWorldMatrix[i],
+			utils.MakeScaleMatrix(scaleValue - 1.5));
+	}
+	// Scale Table
+	objectWorldMatrix[3] = utils.multiplyMatrices(
+		objectWorldMatrix[i],
+		utils.MakeScaleMatrix(scaleValue));
 }
 
 var pressed = true; // Used to move the paddles
@@ -483,7 +498,7 @@ function computeMatrices() {
 	
 	var eyeTemp = [cx, cy, cz];
 	
-	for (i = 0; i < sceneObjects; i++) {
+	for (i = 0; i < sceneObjects; i++) {		
 		projectionMatrix[i] = utils.multiplyMatrices(viewMatrix, objectWorldMatrix[i]);
 		projectionMatrix[i] = utils.multiplyMatrices(perspectiveMatrix, projectionMatrix[i]);
 		
@@ -495,29 +510,46 @@ function computeMatrices() {
 	}
 }
 
-function animate() {
-	//var currentTime = (new Date).getTime();
-	
-    /*if (lastUpdateTime) {
-      var deltaC = (30 * (currentTime - lastUpdateTime)) / 1000.0;
-      hx += deltaC;
-      hy -= deltaC;
-      hz += deltaC;    
-	}*/
+var isAnimation = false; // Default no animation
 
-	//lastUpdateTime = currentTime;    
+function startAnimation() {
+	isAnimation = true;
+}
+
+function stopAnimation() {
+	isAnimation = false;
+}
+
+// Animation to rotate the table
+function animate() {
 	
+	var currentTime = (new Date).getTime();
+	
+    if (lastUpdateTime) {
+		for (i = 0; i < sceneObjects; i++) {
+			objectWorldMatrix[i] = utils.multiplyMatrices(
+				objectWorldMatrix[i],
+				utils.MakeRotateYMatrix(1));
+		}    
+	}
+
+	lastUpdateTime = currentTime;    
+}
+
+function movement() {
+	// If key pressed move the paddle
 	if (pressed) {
 		objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx, hy, hz));
 	}
-
 }
 	
 function drawScene() {
 
 		utils.resizeCanvasToDisplaySize(gl.canvas);
 
-		animate();
+		if (isAnimation) { animate(); }
+
+		movement();
 		
 		computeMatrices();
 
