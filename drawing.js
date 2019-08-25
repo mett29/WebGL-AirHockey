@@ -3,7 +3,7 @@ var gl = null;
 
 var lastUpdateTime = (new Date).getTime();
 
-var	shaderProgram = new Array(2); //Two handles, one for each shaders' couple. 0 = goureaud; 1 = phong
+var	shaderProgram = new Array(2); // Two handles, one for each shaders' couple. 0 = goureaud; 1 = phong
 	
 var shaderDir = "http://127.0.0.1:8887/shaders/";	
 var modelsDir = "http://127.0.0.1:8887/models/";
@@ -40,7 +40,7 @@ var lightDirection = [Math.cos(dirLightAlpha) * Math.cos(dirLightBeta),
 					  ];
 var lightPosition = [0.0, 3.0, 0.0];					  
 var lightColor = new Float32Array([1.0, 1.0, 1.0, 1.0]);
-var moveLight = 0; //0 : move the camera - 1 : move the lights
+var moveLight = 0; // 0 : move the camera - 1 : move the lights
 
 var sceneObjects; // Total number of nodes 
 // The following arrays have sceneObjects as dimension.	
@@ -57,12 +57,13 @@ var nTexture =             new Array();	// Number of textures per object
 // Scale parameter
 scaleValue = 5.0;
 
-// Parameters for camera (10/13/36) -20 -20
-var cx = 10.0;
+// Parameters for camera
+var cx = 10.2;
 var cy = 13.0;
 var cz = 36.0;
-var elevation = -20.0;
-var angle = -16.0;
+var angle = -17;
+var elevation = -20;
+var FOV = 2; // Field Of View
 
 var delta = 2.0;
 
@@ -105,7 +106,6 @@ function main() {
 		gl.clearColor(0.9, 0.9, 0.9, 0);
 		gl.viewport(0.0, 0.0, w, h);
 		gl.enable(gl.DEPTH_TEST);
-		perspectiveMatrix = utils.MakePerspective(12, w/h, 0.1, 100.0);
 
 		// Open the json file containing the 3D model to load,
 		// parse it to retreive objects' data
@@ -124,9 +124,14 @@ function main() {
 		// Rendering cycle
 		drawScene();
 
-		// Setup slider
-		webglLessonsUI.setupSlider("#cameraAngle", {value: cameraAngleDeg, slide: updateCameraAngle, min: -180, max: 180});
+		// Setup slider for camera angle
+		webglLessonsUI.setupSlider("#cameraAngle", {value: cameraAngleDeg, slide: updateCameraAngle, min: -180, max: 180, precision: 2, step: 0.001});
 
+		// Setup slider for camera elevation
+		webglLessonsUI.setupSlider("#cameraElevation", {value: cameraElevation, slide: updateCameraElevation, min: -180, max: 180, precision: 2, step: 0.001});
+
+		// Setup slider for the field of view (FOV)
+		webglLessonsUI.setupSlider("#fieldOfView", {value: cameraFOV, slide: updateFOV, min: -10, max: 10, precision: 2, step: 0.001});
 		
 	} else {
 		alert("Error: Your browser does not appear to support WebGL.");
@@ -134,24 +139,39 @@ function main() {
 	
 }
 
-var cameraAngleDeg = 0;
+// Default values for sliders
+var cameraAngleDeg = -17;
+var cameraElevation = -20;
+var cameraFOV = 2;
 
-// Function for the slider
+// Function for the angle slider
 function updateCameraAngle(event, ui) {
 	cameraAngleDeg = (ui.value);
-	for (i = 0; i < sceneObjects; i++) {
-		objectWorldMatrix[i] = utils.multiplyMatrices(
-			objectWorldMatrix[i],
-			utils.MakeRotateYMatrix(cameraAngleDeg));
-	}
+	angle = cameraAngleDeg;
 }
 
-// Rotate camera by 90°
-function updateCamera() {
-	for (i = 0; i < sceneObjects; i++) {
-		objectWorldMatrix[i] = utils.multiplyMatrices(
-			objectWorldMatrix[i],
-			utils.MakeRotateYMatrix(90));	
+// Function for the elevation slider
+function updateCameraElevation(event, ui) {
+	cameraElevation = (ui.value);
+	elevation = -cameraElevation;
+}
+
+// Function for the FOV slider
+function updateFOV(event, ui) {
+	cameraFOV = (ui.value);
+	FOV = cameraFOV;
+}
+
+// Change camera view (FRONT, TOP, BACK)
+function updateCamera(choice) {
+	if (choice == 0) {
+		cameraAngleDeg = -17;
+		cameraElevation = -20;
+	} else if (choice == 1) {
+		cameraElevation = -74;
+	} else {
+		cameraAngleDeg = 163;
+		cameraElevation = -20;
 	}
 }
 
@@ -292,7 +312,6 @@ function loadModel(modelName) {
 				if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.diffuse") diffuseColorPropertyIndex = n;
 				if(loadedModel.materials[meshMatIndex].properties[n].key == "$clr.specular") specularColorPropertyIndex = n;
 			}
-
 			
 			// Getting vertex and normals					
 			var objVertex = [];		
@@ -383,35 +402,33 @@ function loadModel(modelName) {
 								);
 			}
 			
-			indexBufferObjectId[i] = gl.createBuffer ();
+			indexBufferObjectId[i] = gl.createBuffer();
 			gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBufferObjectId[i]);
-			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(facesData),gl.STATIC_DRAW);
+			gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(facesData), gl.STATIC_DRAW);
 						
 		
 			// Creating the objects' world matrix
 			objectWorldMatrix[i] = loadedModel.rootnode.children[i].transformation;
 
 			// Correcting the orientation 
-			//correctOrientation();
+			correctOrientation();
 		}
 
 		// Scale the objects
-		scaleObjects();
+		//scaleObjects();
 	});
 }
 
 function correctOrientation() {
 	objectWorldMatrix[i] = utils.multiplyMatrices(
 		objectWorldMatrix[i],
-		utils.MakeRotateYMatrix(-109));	
+		utils.MakeRotateYMatrix(-107));	
 
-	objectWorldMatrix[i] = utils.multiplyMatrices(
+	// Inclinazione
+	
+	/*objectWorldMatrix[i] = utils.multiplyMatrices(
 			objectWorldMatrix[i],
-			utils.MakeRotateZMatrix(-8));
-
-	objectWorldMatrix[i] = utils.multiplyMatrices(
-		objectWorldMatrix[i],
-		utils.MakeTranslateMatrix(0, 0, -2.5));
+			utils.MakeRotateZMatrix(0));*/
 }
 
 function scaleObjects() {
@@ -434,19 +451,19 @@ function initInteraction() {
 	var keyFunction = function(e) {
 		
 		if (e.keyCode == 37) {	// Left arrow
-			if (moveLight == 0) cx -= delta;
+			if (moveLight == 0) angle -= delta*0.5;
 			else lightPosition[0] -= delta;
 		}
 		if (e.keyCode == 39) {	// Right arrow
-			if (moveLight == 0) cx  += delta;
+			if (moveLight == 0) angle  += delta*0.5;
 			else lightPosition[0] += delta;
 		}	
 		if (e.keyCode == 38) {	// Up arrow
-			if (moveLight == 0)  cz -= delta;
+			if (moveLight == 0)  elevation += delta*0.5;
 			else lightPosition[2] -= delta;
 		}
 		if (e.keyCode == 40) {	// Down arrow
-			if (moveLight == 0)  cz += delta;
+			if (moveLight == 0)  elevation -= delta*0.5;
 			else lightPosition[2] += delta;
 		}
 		if (e.keyCode == 90) {	// Z
@@ -474,7 +491,6 @@ function initInteraction() {
 			resetValues();
 			hx -= speedHandleUpDown;
 		}
-	//console.log(" ("+cx + "/" + cy + "/" + cz + ") - "+ elevation + "." + angle);	
 	}
 		
 	window.addEventListener("keydown", keyFunction, false);
@@ -491,10 +507,16 @@ function resetValues() { // In this way I do not have to press the keys twice in
 	hz = 0;
 }
 
-
 function computeMatrices() {
 
-	viewMatrix = utils.MakeView(cx, cy, cz, elevation, angle);
+	//viewMatrix = utils.MakeView(cx, cy, cz, elevation, angle);
+	var cameraMatrix = utils.MakeRotateYMatrix(cameraAngleDeg);
+	cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeRotateXMatrix(cameraElevation));
+    cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeTranslateMatrix(0, 0, 50));
+	
+	viewMatrix = utils.invertMatrix(cameraMatrix);
+
+	perspectiveMatrix = utils.MakePerspective(FOV, canvas.clientWidth/canvas.clientHeight, 0.1, 100);
 	
 	var eyeTemp = [cx, cy, cz];
 	
@@ -504,7 +526,7 @@ function computeMatrices() {
 		
 		lightDirectionObj[i] = utils.multiplyMatrix3Vector3(utils.transposeMatrix3(utils.sub3x3from4x4(objectWorldMatrix[i])), lightDirection); 
 		
-		lightPositionObj[i] = utils.multiplyMatrix3Vector3(utils.invertMatrix3(utils.sub3x3from4x4(objectWorldMatrix[i])),lightPosition);
+		lightPositionObj[i] = utils.multiplyMatrix3Vector3(utils.invertMatrix3(utils.sub3x3from4x4(objectWorldMatrix[i])), lightPosition);
 		
 		observerPositionObj[i] = utils.multiplyMatrix3Vector3(utils.invertMatrix3(utils.sub3x3from4x4(objectWorldMatrix[i])), eyeTemp); 
 	}
@@ -516,30 +538,22 @@ function startAnimation() {
 	isAnimation = true;
 }
 
-function stopAnimation() {
+// Reset everything to the initial position (also stops the animation)
+function reset() {
 	isAnimation = false;
+	location.reload();
 }
 
 // Animation to rotate the table
 function animate() {
-	
-	var currentTime = (new Date).getTime();
-	
-    if (lastUpdateTime) {
-		for (i = 0; i < sceneObjects; i++) {
-			objectWorldMatrix[i] = utils.multiplyMatrices(
-				objectWorldMatrix[i],
-				utils.MakeRotateYMatrix(1));
-		}    
-	}
-
-	lastUpdateTime = currentTime;    
+	cameraAngleDeg += 0.1;
 }
 
 function movement() {
 	// If key pressed move the paddle
 	if (pressed) {
 		objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx, hy, hz));
+		//console.log(objectWorldMatrix[0]);
 	}
 }
 	
@@ -627,4 +641,42 @@ function requestCORSIfNotSameOrigin(img, url) {
   if ((new URL(url)).origin !== window.location.origin) {
     img.crossOrigin = "";
   }
+}
+
+function subtractVectors(a, b) {
+	return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+}
+
+function normalize(v) {
+	var length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+	// make sure we don't divide by 0.
+	if (length > 0.00001) {
+		return [v[0] / length, v[1] / length, v[2] / length];
+	} else {
+		return [0, 0, 0];
+	}
+}
+
+function cross(a, b) {
+	return [a[1] * b[2] - a[2] * b[1],
+			a[2] * b[0] - a[0] * b[2],
+			a[0] * b[1] - a[1] * b[0]];
+}
+
+var m4 = {
+	lookAt: function(cameraPosition, target, up) {
+	  var zAxis = normalize(
+		  subtractVectors(cameraPosition, target));
+	  var xAxis = normalize(cross(up, zAxis));
+	  var yAxis = normalize(cross(zAxis, xAxis));
+	  return [
+		 xAxis[0], xAxis[1], xAxis[2], 0,
+		 yAxis[0], yAxis[1], yAxis[2], 0,
+		 zAxis[0], zAxis[1], zAxis[2], 0,
+		 cameraPosition[0],
+		 cameraPosition[1],
+		 cameraPosition[2],
+		 1,
+	  ];
+	},
 }
