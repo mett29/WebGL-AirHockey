@@ -25,6 +25,7 @@ var lightDirectionHandle = new Array(2);
 var lightPositionHandle = new Array(2);
 var lightColorHandle  = new Array(2);
 var lightTypeHandle = new Array(2);
+var specularReflectionHandle = new Array(2);
 var	eyePositionHandle = new Array(2);
 var materialSpecColorHandle = new Array(2);
 var materialSpecPowerHandle  = new Array(2);
@@ -40,7 +41,6 @@ var lightDirection = [Math.cos(dirLightAlpha) * Math.cos(dirLightBeta),
 ];
 var lightPosition = [0.0, 3.0, 0.0];
 var lightColor = new Float32Array([1.0, 1.0, 1.0, 1.0]);
-var moveLight = 0; // 0 : move the camera - 1 : move the lights
 
 var sceneObjects; // Total number of nodes 
 // The following arrays have sceneObjects as dimension.	
@@ -55,7 +55,7 @@ var diffuseTextureObj =    new Array();	// Texture material
 var nTexture =             new Array();	// Number of textures per object				
 
 // Scale parameter
-scaleValue = 5.0;
+//scaleValue = 5.0;
 
 // Parameters for camera
 var cx = 10.2;
@@ -67,14 +67,19 @@ var FOV = 2; // Field Of View
 
 var delta = 2.0;
 
+// Timer of the game
+var clock = 0.0;
+var timer;
+
 // Parameters for handles & disk
 var speedHandleLeftRight = 0.015;
 var speedHandleUpDown = 0.015;
 var speedDisk = 0.015;
 
-//score
+// Players' scores
 var player1 = 0;
 var player2 = 0;
+
 // Parameters for handle1
 var hx1 = 0.0;
 var hy1 = 0.0;
@@ -99,6 +104,7 @@ var lightPositionObj = new Array();
 
 var currentLightType = 1;
 var currentShader = 0;         // Defines the current shader in use.
+var currentSpecularReflection = 1; // Phong
 var textureInfluence = 1.0;
 var ambientLightInfluence = 0.0;
 var ambientLightColor = [1.0, 1.0, 1.0, 1.0];
@@ -137,6 +143,8 @@ function main() {
         // Setting up the interaction using keys (we use this to move the paddles)
         initInteraction();
 
+        timer = document.getElementById("time");
+
         // Rendering cycle
         drawScene();
 
@@ -152,11 +160,10 @@ function main() {
     } else {
         alert("Error: Your browser does not appear to support WebGL.");
     }
-
 }
 
 // Default values for sliders
-var cameraAngleDeg = -17;
+var cameraAngleDeg = 90;
 var cameraElevation = -20;
 var cameraFOV = 2;
 
@@ -181,12 +188,12 @@ function updateFOV(event, ui) {
 // Change camera view (FRONT, TOP, BACK)
 function updateCamera(choice) {
     if (choice == 0) {
-        cameraAngleDeg = -17;
+        cameraAngleDeg = 90;
         cameraElevation = -20;
     } else if (choice == 1) {
         cameraElevation = -74;
     } else {
-        cameraAngleDeg = 163;
+        cameraAngleDeg = -90;
         cameraElevation = -20;
     }
 }
@@ -200,16 +207,12 @@ function updateLightType(val) {
     currentLightType = parseInt(val);
 }
 
-function updateLightMovement() {
-    if (checkbox.checked == true) {
-        moveLight = 1;
-    } else {
-        moveLight = 0;
-    }
-}
-
 function updateShader(val) {
     currentShader = parseInt(val);
+}
+
+function updateSpecRefl(val) {
+    currentSpecularReflection = parseInt(val);
 }
 
 function updateAmbientLightInfluence(val) {
@@ -232,7 +235,7 @@ function loadShaders() {
             shaderDir + 'fs_g.glsl'
         ],
         function(shaderText){
-            // odd numbers are VSs, even are FSs
+            // Odd numbers are VSs, even are FSs
             var numShader = 0;
             for (i = 0; i < shaderText.length; i += 2) {
                 var vertexShader = gl.createShader(gl.VERTEX_SHADER);
@@ -259,7 +262,6 @@ function loadShaders() {
         });
 
     // Getting the handles to the shaders' vars
-
     for (i = 0; i < 2; i++) {
         vertexPositionHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inPosition');
         vertexNormalHandle[i] = gl.getAttribLocation(shaderProgram[i], 'inNormal');
@@ -281,7 +283,8 @@ function loadShaders() {
         lightDirectionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightDirection');
         lightPositionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightPosition');
         lightColorHandle[i] = gl.getUniformLocation(shaderProgram[i], 'lightColor');
-        lightTypeHandle[i]= gl.getUniformLocation(shaderProgram[i],'lightType');
+        lightTypeHandle[i]= gl.getUniformLocation(shaderProgram[i], 'lightType');
+        specularReflectionHandle[i] = gl.getUniformLocation(shaderProgram[i], 'specularReflection');
     }
 }
 
@@ -373,6 +376,7 @@ function loadModel(modelName) {
 
                         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
                         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+                        // Magnification & Minification filter choice
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                         gl.generateMipmap(gl.TEXTURE_2D);
@@ -466,31 +470,21 @@ function initInteraction() {
 
     var keyFunction = function(e) {
 
-        if (e.keyCode == 37) {	// Left arrow
-            if (moveLight == 0) angle -= delta*0.5;
-            else lightPosition[0] -= delta;
+        // KEYS TO MOVE LIGHTS
+        if (e.keyCode == 76) {	// l
+            lightPosition[0] -= delta;
         }
-        if (e.keyCode == 39) {	// Right arrow
-            if (moveLight == 0) angle  += delta*0.5;
-            else lightPosition[0] += delta;
+        if (e.keyCode == 74) {	// j
+            lightPosition[0] += delta;
         }
-        if (e.keyCode == 38) {	// Up arrow
-            if (moveLight == 0)  elevation += delta*0.5;
-            else lightPosition[2] -= delta;
+        if (e.keyCode == 75) {	// k
+            lightPosition[2] -= delta;
         }
-        if (e.keyCode == 40) {	// Down arrow
-            if (moveLight == 0)  elevation -= delta*0.5;
-            else lightPosition[2] += delta;
-        }
-        if (e.keyCode == 90) {	// Z
-            if (moveLight == 0)  cy += delta;
-            else lightPosition[1] += delta;
-        }
-        if (e.keyCode == 88) {	// X
-            if (moveLight == 0)  cy -= delta;
-            else lightPosition[1] -= delta;
+        if (e.keyCode == 73) {	// i
+            lightPosition[2] += delta;
         }
 
+        // KEYS TO MOVE PADDLES
         if (e.keyCode == 65 ) {	// a
             resetValues1();
             hz1 -= speedHandleLeftRight;
@@ -508,19 +502,19 @@ function initInteraction() {
             hx1 -= speedHandleUpDown;
         }
 
-        if (e.keyCode == 76 ) {	// l
+        if (e.keyCode == 37) {	// Left arrow
             resetValues2();
             hz2 -= speedHandleLeftRight;
         }
-        if (e.keyCode == 74 ) {	// j
+        if (e.keyCode == 39) {	// Right arrow
             resetValues2();
             hz2 += speedHandleLeftRight;
         }
-        if (e.keyCode == 75 ) {	// k
+        if (e.keyCode == 38) {	// Up arrow
             resetValues2();
             hx2 += speedHandleUpDown;
         }
-        if (e.keyCode == 73) {	// i
+        if (e.keyCode == 40) {	// Down arrow
             resetValues2();
             hx2 -= speedHandleUpDown;
         }
@@ -528,28 +522,26 @@ function initInteraction() {
 
     window.addEventListener("keydown", keyFunction, false);
 
-    //in this way there aren't problem when a player press the keys meanwhile the other player isn't pressing the keys
+    // In this way there aren't problems when a player presses the keys meanwhile the other player isn't pressing any keys
     window.addEventListener('keyup', function(e) {
 
-        if(e.keyCode>72 && e.keyCode<77)
-        {
+        if (e.keyCode >= 37 && e.keyCode <= 40) {
             pressed = false;
             resetValues2();
-        }else{
+        } else {
             pressed = false;
             resetValues1();
         }
     });
 }
 
-
-function resetValues1() { // In this way I do not have to press the keys twice in order to change direction PAD1
+function resetValues1() { // In this way I do not have to press the keys twice in order to change direction (PAD1)
     pressed = true;
     hx1 = 0;
     hy1 = 0;
     hz1 = 0;
 }
-function resetValues2() { // In this way I do not have to press the keys twice in order to change direction PAD2
+function resetValues2() { // In this way I do not have to press the keys twice in order to change direction (PAD2)
     pressed = true;
     hx2 = 0;
     hy2 = 0;
@@ -559,16 +551,27 @@ function resetValues3(){
     hx3 = 0;
     hy3 = 0;
     hz3 = 0;
-
 }
 
 function computeMatrices() {
 
     //viewMatrix = utils.MakeView(cx, cy, cz, elevation, angle);
+
+    /* 
+		The camera is considered an object initially positioned in the origin, and aiming along the negative z-axis.
+		We then consider a transformation matrix Mc that moves the camera object to its target position and direction. 
+		We will call this matrix the Camera Matrix. 
+		Look-in direction model is used.
+	*/
     var cameraMatrix = utils.MakeRotateYMatrix(cameraAngleDeg);
     cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeRotateXMatrix(cameraElevation));
     cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeTranslateMatrix(0, 0, 50));
 
+    /*
+		If we apply the inverse of Mc to all the objects in the scene, we obtain a new 3D world where the projection plane is parallel to the
+		xy-plane, and the center of projection is in the origin (as required by both the parallel and the perspective matrices).
+		Mc^(-1) is called View Matrix
+	*/
     viewMatrix = utils.invertMatrix(cameraMatrix);
 
     perspectiveMatrix = utils.MakePerspective(FOV, canvas.clientWidth/canvas.clientHeight, 0.1, 100);
@@ -576,6 +579,7 @@ function computeMatrices() {
     var eyeTemp = [cx, cy, cz];
 
     for (i = 0; i < sceneObjects; i++) {
+        // Computing the World-View-Projection matrix
         projectionMatrix[i] = utils.multiplyMatrices(viewMatrix, objectWorldMatrix[i]);
         projectionMatrix[i] = utils.multiplyMatrices(perspectiveMatrix, projectionMatrix[i]);
 
@@ -602,11 +606,15 @@ function reset() {
 // Animation to rotate the table
 function animate() {
     cameraAngleDeg += 0.1;
+    // This is useful to show that by rotating the object instead of the camera, the light changes
+	/* for (i = 0; i < sceneObjects; i++) {
+		objectWorldMatrix[i] = utils.multiplyMatrices(
+			objectWorldMatrix[i],
+			utils.MakeRotateZMatrix(0.1));
+	} */
 }
 
-
-function padDiskImpact(){
-
+function padDiskImpact() {
 
     var c20 = Math.cos(28*Math.PI/180);
     var c40 = Math.cos(43*Math.PI/180);
@@ -618,39 +626,39 @@ function padDiskImpact(){
     var c140 = Math.cos(137*Math.PI/180);
     var c155 = Math.cos(152*Math.PI/180);
 
-
-    //  DISK-PAD1
-    if( ((((objectWorldMatrix[2][3] + 0.7) - objectWorldMatrix[0][3]) *  ((objectWorldMatrix[2][3] + 0.7) - objectWorldMatrix[0][3])) +
+    // DISK-PAD1
+    if (((((objectWorldMatrix[2][3] + 0.7) - objectWorldMatrix[0][3]) *  ((objectWorldMatrix[2][3] + 0.7) - objectWorldMatrix[0][3])) +
         (((objectWorldMatrix[2][11] + 0.03) - objectWorldMatrix[0][11] ) * ((objectWorldMatrix[2][11] + 0.03) - objectWorldMatrix[0][11] ))) < (0.1 * 0.1))
     {
-        //0-90
-        if((objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[0][11]))
+        playHitSound(); // Activate sound effect
+        // 0-90
+        if ((objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[0][11]))
         {
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3] + 0.1 * c20))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c40 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c20))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c40 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * -0.5;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c50  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c40))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c50  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c40))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c70  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c50))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c70  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c50))
             {
                 resetValues3();
                 hx3 = speedDisk * 0.5;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c70))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c70))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -658,34 +666,34 @@ function padDiskImpact(){
             }
         }
 
-        //270-360
-        if((objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[0][11]))
+        // 270-360
+        if ((objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[0][11]))
         {
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3] + 0.1 * c20))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 >= objectWorldMatrix[0][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c40 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c20))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c40 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0.5;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c50  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c40))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c50  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c40))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c70  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c50))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c70  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c50))
             {
                 resetValues3();
                 hx3 = speedDisk * 0.5;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 >= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c70))
+            if ((objectWorldMatrix[2][3] + 0.7 >= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3] + 0.1 * c70))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -693,34 +701,34 @@ function padDiskImpact(){
             }
         }
 
-        //90-180
-        if((objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[0][11]))
+        // 90-180
+        if ((objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[0][11]))
         {
-            if( (objectWorldMatrix[2][3] + 0.7 >= -0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 <= objectWorldMatrix[0][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] + 0.7 >= -0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 <= objectWorldMatrix[0][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c140 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c140 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * -0.5;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c130  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c140))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c130  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c140))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c110  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c130))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c110  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c130))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c110))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c110))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -728,34 +736,34 @@ function padDiskImpact(){
             }
         }
 
-        //180-270
-        if((objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[0][11]))
+        // 180-270
+        if ((objectWorldMatrix[2][3] + 0.7 < objectWorldMatrix[0][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[0][11]))
         {
-            if( (objectWorldMatrix[2][3] + 0.7 >= -0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 <= objectWorldMatrix[0][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] + 0.7 >= -0.1 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 <= objectWorldMatrix[0][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c140 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c140 + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0.5;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c130  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c140))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c130  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c140))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c110  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c130))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c110  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c130))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] + 0.7 <= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c110))
+            if ((objectWorldMatrix[2][3] + 0.7 <= 0.1 * c90  + objectWorldMatrix[0][3])  && (objectWorldMatrix[2][3] + 0.7 > objectWorldMatrix[0][3] + 0.1 * c110))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -764,12 +772,13 @@ function padDiskImpact(){
         }
     }
 
-    //  DISK-PAD2
-    if( ((((objectWorldMatrix[2][3] - 0.74) - objectWorldMatrix[1][3]) *  ((objectWorldMatrix[2][3] - 0.74) - objectWorldMatrix[1][3])) +
+    // DISK-PAD2
+    if (((((objectWorldMatrix[2][3] - 0.74) - objectWorldMatrix[1][3]) *  ((objectWorldMatrix[2][3] - 0.74) - objectWorldMatrix[1][3])) +
         (((objectWorldMatrix[2][11] + 0.03) - objectWorldMatrix[1][11] ) * ((objectWorldMatrix[2][11] + 0.03) - objectWorldMatrix[1][11] ))) < (0.1 * 0.1))
     {
-        //0-90
-        if((objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[1][11]))
+        playHitSound(); // Activate sound effect
+        // 0-90
+        if ((objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[1][11]))
         {
             if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3] + 0.1 * c20))
             {
@@ -803,34 +812,34 @@ function padDiskImpact(){
             }
         }
 
-        //270-360
-        if((objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[1][11]))
+        // 270-360
+        if ((objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[1][11]))
         {
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3] + 0.1 * c20))
+            if ( (objectWorldMatrix[2][3] - 0.74 <= 0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 >= objectWorldMatrix[1][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c40 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c20))
+            if ( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c40 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c20))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0.5;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c50  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c40))
+            if ( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c50  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c40))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c70  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c50))
+            if ( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c70  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c50))
             {
                 resetValues3();
                 hx3 = speedDisk * 0.5;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c70))
+            if ( (objectWorldMatrix[2][3] - 0.74 >= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3] + 0.1 * c70))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -838,34 +847,34 @@ function padDiskImpact(){
             }
         }
 
-        //90-180
-        if((objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[1][11]))
+        // 90-180
+        if ((objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 <= objectWorldMatrix[1][11]))
         {
-            if( (objectWorldMatrix[2][3] - 0.74 >= -0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 <= objectWorldMatrix[1][3] + 0.1 * c155))
+            if ( (objectWorldMatrix[2][3] - 0.74 >= -0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 <= objectWorldMatrix[1][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c140 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c155))
+            if ( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c140 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * -0.5;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c130  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c140))
+            if ( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c130  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c140))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c110  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c130))
+            if ( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c110  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c130))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * -1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c110))
+            if ( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c110))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -873,34 +882,34 @@ function padDiskImpact(){
             }
         }
 
-        //180-270
-        if((objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[1][11]))
+        // 180-270
+        if ((objectWorldMatrix[2][3] - 0.74 < objectWorldMatrix[1][3]) && (objectWorldMatrix[2][11] + 0.03 > objectWorldMatrix[1][11]))
         {
-            if( (objectWorldMatrix[2][3] - 0.74 >= -0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 <= objectWorldMatrix[1][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] - 0.74 >= -0.1 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 <= objectWorldMatrix[1][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c140 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c155))
+            if ((objectWorldMatrix[2][3] - 0.74 <= 0.1 * c140 + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c155))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0.5;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c130  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c140))
+            if ((objectWorldMatrix[2][3] - 0.74 <= 0.1 * c130  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c140))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c110  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c130))
+            if ((objectWorldMatrix[2][3] - 0.74 <= 0.1 * c110  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c130))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * 1;
             }
-            if( (objectWorldMatrix[2][3] - 0.74 <= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c110))
+            if ((objectWorldMatrix[2][3] - 0.74 <= 0.1 * c90  + objectWorldMatrix[1][3])  && (objectWorldMatrix[2][3] - 0.74 > objectWorldMatrix[1][3] + 0.1 * c110))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -910,9 +919,9 @@ function padDiskImpact(){
     }
 }
 
-function padsMove(){
+function padsMove() {
 
-    //         Move the paddle 1 with control
+    // Move the paddle 1 with control
 
     if (pressed && hx1>0 && objectWorldMatrix[0][3]<= 0.63 && hz1==0) {
         objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx1, hy1, hz1));
@@ -931,9 +940,9 @@ function padsMove(){
         }
 
     }
-    if(objectWorldMatrix[0][3]<= 0.06 && objectWorldMatrix[0][3]>= -0.15)
+    if (objectWorldMatrix[0][3]<= 0.06 && objectWorldMatrix[0][3]>= -0.15)
     {
-        if(objectWorldMatrix[0][11]< -0.19){
+        if (objectWorldMatrix[0][11]< -0.19) {
 
             if (pressed && hz1>0 && objectWorldMatrix[0][11]<= 0.41 && hx1==0) {
                 objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx1, hy1, hz1));
@@ -944,7 +953,7 @@ function padsMove(){
             }
         }
 
-        if(objectWorldMatrix[0][11]>= -0.19 && objectWorldMatrix[0][11]<= 0.25){
+        if (objectWorldMatrix[0][11]>= -0.19 && objectWorldMatrix[0][11]<= 0.25) {
 
             if (pressed && hz1>0 && objectWorldMatrix[0][11]<= 0.41 && hx1==0) {
                 objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx1, hy1, hz1));
@@ -957,7 +966,7 @@ function padsMove(){
             }
         }
 
-        if(objectWorldMatrix[0][11]> 0.25){
+        if (objectWorldMatrix[0][11]> 0.25) {
 
             if (pressed && hz1<0 && objectWorldMatrix[0][11]>= -0.35 && hx1==0) {
                 objectWorldMatrix[0] = utils.multiplyMatrices(objectWorldMatrix[0], utils.MakeTranslateMatrix(hx1, hy1, hz1));
@@ -970,13 +979,13 @@ function padsMove(){
 
     }
 
-    //     Move the paddle 2 with control
+    // Move the paddle 2 with control
 
     if (pressed && hx2<0 && objectWorldMatrix[1][3]> -0.67 && hz2==0) {
         objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
     }
 
-    if(objectWorldMatrix[1][3]>= -0.68 && objectWorldMatrix[1][3]< -0.1){
+    if (objectWorldMatrix[1][3]>= -0.68 && objectWorldMatrix[1][3]< -0.1) {
 
         if (pressed && hz2>0 && objectWorldMatrix[1][11]<= 0.41 && hx2==0) {
             objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
@@ -987,11 +996,9 @@ function padsMove(){
         if (pressed && hx2>0 && hz2==0  && objectWorldMatrix[1][3]<= 0.06 ) {
             objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
         }
-
     }
-    if(objectWorldMatrix[1][3]>= -0.1 && objectWorldMatrix[1][3]<= 0.11)
-    {
-        if(objectWorldMatrix[1][11]< -0.19){
+    if (objectWorldMatrix[1][3]>= -0.1 && objectWorldMatrix[1][3]<= 0.11) {
+        if(objectWorldMatrix[1][11]< -0.19) {
 
             if (pressed && hz2>0 && objectWorldMatrix[1][11]<= 0.41 && hx2==0) {
                 objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
@@ -1002,7 +1009,7 @@ function padsMove(){
             }
         }
 
-        if(objectWorldMatrix[1][11]>= -0.19 && objectWorldMatrix[1][11]<= 0.25){
+        if (objectWorldMatrix[1][11]>= -0.19 && objectWorldMatrix[1][11]<= 0.25) {
 
             if (pressed && hz2>0 && objectWorldMatrix[1][11]<= 0.41 && hx2==0) {
                 objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
@@ -1015,7 +1022,7 @@ function padsMove(){
             }
         }
 
-        if(objectWorldMatrix[1][11]> 0.25){
+        if (objectWorldMatrix[1][11]> 0.25) {
 
             if (pressed && hz2<0 && objectWorldMatrix[1][11]>= -0.35 && hx2==0) {
                 objectWorldMatrix[1] = utils.multiplyMatrices(objectWorldMatrix[1], utils.MakeTranslateMatrix(hx2, hy2, hz2));
@@ -1026,20 +1033,20 @@ function padsMove(){
             }
         }
     }
-
 }
 
-function goal(){
+function goal() {
+    playGoalSound(); // Activate goal sound effect
     resetValues1();
     resetValues2();
     resetValues3();
-    for(i=0;i<3;i++){
+    for (i = 0; i < 3; i++) {
         objectWorldMatrix[i][3] = 0;
         objectWorldMatrix[i][11] = 0;
     }
 }
 
-function diskTableImpact(){
+function diskTableImpact() {
 
     var s20 = Math.sin(20*Math.PI/180);
     var s40 = Math.sin(40*Math.PI/180);
@@ -1047,37 +1054,38 @@ function diskTableImpact(){
     var s70 = Math.sin(70*Math.PI/180);
     var s90 = Math.sin(90*Math.PI/180);
 
-    // disk - table curve
-    //up-left
-    if( objectWorldMatrix[2][11] <= -0.224 && objectWorldMatrix[2][3] <= -0.645)
+    // Disk - table curve
+    // Up-left
+    if (objectWorldMatrix[2][11] <= -0.224 && objectWorldMatrix[2][3] <= -0.645)
     {
-        if( (((objectWorldMatrix[2][11] - (-0.225)) * (objectWorldMatrix[2][11] - (-0.225))) + ((objectWorldMatrix[2][3] - (-0.645)) * (objectWorldMatrix[2][3] - (-0.645))) ) >= (0.195 * 0.195) )
+        playEdgeSound(); // Activate edge sound effect
+        if ((((objectWorldMatrix[2][11] - (-0.225)) * (objectWorldMatrix[2][11] - (-0.225))) + ((objectWorldMatrix[2][3] - (-0.645)) * (objectWorldMatrix[2][3] - (-0.645)))) >= (0.195 * 0.195))
         {
-            if( objectWorldMatrix[2][11] <= -0.225 && ( objectWorldMatrix[2][11] > -0.2 * s20 - 0.225)  )
+            if (objectWorldMatrix[2][11] <= -0.225 && ( objectWorldMatrix[2][11] > -0.2 * s20 - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s20  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s40  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s20  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s40  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0.5;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s50  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s50  - 0.225))
             {
                 resetValues3();
                 hx3 += speedDisk;
                 hz3 += speedDisk;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s50  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s70  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s50  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s70  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0.5;
                 hz3 = speedDisk * 1;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s70  - 0.225) && ( objectWorldMatrix[2][11] >= -0.2 * s90  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s70  - 0.225) && ( objectWorldMatrix[2][11] >= -0.2 * s90  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -1086,36 +1094,37 @@ function diskTableImpact(){
         }
     }
 
-    //up right
-    if( objectWorldMatrix[2][11] <= -0.224 && objectWorldMatrix[2][3] >= 0.645)
+    // Up-right
+    if (objectWorldMatrix[2][11] <= -0.224 && objectWorldMatrix[2][3] >= 0.645)
     {
-        if( (((objectWorldMatrix[2][11] - (-0.225)) * (objectWorldMatrix[2][11] - (-0.225))) + ((objectWorldMatrix[2][3] - 0.645) * (objectWorldMatrix[2][3] - 0.645)) ) >= (0.195 * 0.195) )
+        playEdgeSound(); // Activate edge sound effect
+        if ((((objectWorldMatrix[2][11] - (-0.225)) * (objectWorldMatrix[2][11] - (-0.225))) + ((objectWorldMatrix[2][3] - 0.645) * (objectWorldMatrix[2][3] - 0.645))) >= (0.195 * 0.195))
         {
-            if( objectWorldMatrix[2][11] <= -0.225 && ( objectWorldMatrix[2][11] > -0.2 * s20 - 0.225)  )
+            if (objectWorldMatrix[2][11] <= -0.225 && ( objectWorldMatrix[2][11] > -0.2 * s20 - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s20  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s40  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s20  - 0.225) && (objectWorldMatrix[2][11] > -0.2 * s40  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0.5;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && ( objectWorldMatrix[2][11] >=-0.2 * s50  - 0.225)  )
+            if( ( objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && (objectWorldMatrix[2][11] >=-0.2 * s50  - 0.225))
             {
                 resetValues3();
                 hx3 -= speedDisk;
                 hz3 += speedDisk;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s50  - 0.225) && ( objectWorldMatrix[2][11] > -0.2 * s70  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s50  - 0.225) && (objectWorldMatrix[2][11] > -0.2 * s70  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * 1;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s70  - 0.225) && ( objectWorldMatrix[2][11] >= -0.2 * s90  - 0.225)  )
+            if ((objectWorldMatrix[2][11] <= -0.2 * s70  - 0.225) && (objectWorldMatrix[2][11] >= -0.2 * s90  - 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -1124,36 +1133,37 @@ function diskTableImpact(){
         }
     }
 
-    //down left
-    if( objectWorldMatrix[2][11] >= 0.224 && objectWorldMatrix[2][3] <= -0.645)
+    // Down-left
+    if (objectWorldMatrix[2][11] >= 0.224 && objectWorldMatrix[2][3] <= -0.645)
     {
-        if( (((objectWorldMatrix[2][11] - 0.225) * (objectWorldMatrix[2][11] - 0.225)) + ((objectWorldMatrix[2][3] - (-0.645)) * (objectWorldMatrix[2][3] - (-0.645))) ) >= (0.195 * 0.195) )
+        playEdgeSound(); // Activate edge sound effect
+        if ( (((objectWorldMatrix[2][11] - 0.225) * (objectWorldMatrix[2][11] - 0.225)) + ((objectWorldMatrix[2][3] - (-0.645)) * (objectWorldMatrix[2][3] - (-0.645)))) >= (0.195 * 0.195))
         {
-            if( objectWorldMatrix[2][11] >= 0.225 && ( objectWorldMatrix[2][11] < -0.2 * -s20 + 0.225)  )
+            if ( objectWorldMatrix[2][11] >= 0.225 && ( objectWorldMatrix[2][11] < -0.2 * -s20 + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * 0;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s20 + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s40  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s20 + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s40  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * -0.5;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s40  + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s50  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s40  + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s50  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 1;
                 hz3 = speedDisk * -1;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s50  + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s70  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s50  + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s70  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0.5;
                 hz3 = speedDisk * -1;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s70  + 0.225) && ( objectWorldMatrix[2][11] <= -0.2 * -s90  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s70  + 0.225) && (objectWorldMatrix[2][11] <= -0.2 * -s90  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -1162,36 +1172,37 @@ function diskTableImpact(){
         }
     }
 
-    //down right
-    if( objectWorldMatrix[2][11] >= 0.224 && objectWorldMatrix[2][3] >= 0.645)
+    // Down-right
+    if (objectWorldMatrix[2][11] >= 0.224 && objectWorldMatrix[2][3] >= 0.645)
     {
-        if( (((objectWorldMatrix[2][11] - 0.225) * (objectWorldMatrix[2][11] - 0.225)) + ((objectWorldMatrix[2][3] - 0.645) * (objectWorldMatrix[2][3] - 0.645)) ) >= (0.195 * 0.195) )
+        playEdgeSound(); // Activate edge sound effect
+        if ((((objectWorldMatrix[2][11] - 0.225) * (objectWorldMatrix[2][11] - 0.225)) + ((objectWorldMatrix[2][3] - 0.645) * (objectWorldMatrix[2][3] - 0.645))) >= (0.195 * 0.195))
         {
-            if( objectWorldMatrix[2][11] >= 0.225 && ( objectWorldMatrix[2][11] < -0.2 * -s20 + 0.225)  )
+            if (objectWorldMatrix[2][11] >= 0.225 && (objectWorldMatrix[2][11] < -0.2 * -s20 + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s20 + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s40  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s20 + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s40  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * -0.5;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s40  + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s50  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s40  + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s50  + 0.225))
             {
                 resetValues3();
                 hx3 -= speedDisk;
                 hz3 -= speedDisk;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s50  + 0.225) && ( objectWorldMatrix[2][11] < -0.2 * -s70  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s50  + 0.225) && (objectWorldMatrix[2][11] < -0.2 * -s70  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * -0.5;
                 hz3 = speedDisk * -1;
             }
-            if( ( objectWorldMatrix[2][11] >= -0.2 * -s70  + 0.225) && ( objectWorldMatrix[2][11] <= -0.2 * -s90  + 0.225)  )
+            if ((objectWorldMatrix[2][11] >= -0.2 * -s70  + 0.225) && (objectWorldMatrix[2][11] <= -0.2 * -s90  + 0.225))
             {
                 resetValues3();
                 hx3 = speedDisk * 0;
@@ -1200,47 +1211,48 @@ function diskTableImpact(){
         }
     }
 
-    // disk - table left&right
-    if( objectWorldMatrix[2][11] <= -0.42  && objectWorldMatrix[2][3] > - 0.645 && objectWorldMatrix[2][3] < 0.645){
+    // Disk - table left & right
+    if (objectWorldMatrix[2][11] <= -0.42  && objectWorldMatrix[2][3] > - 0.645 && objectWorldMatrix[2][3] < 0.645) {
+        playEdgeSound(); // Activate edge sound effect
         hz3 *= -1;
         hx3 *= 1;
     }
-    if(objectWorldMatrix[2][11] >= 0.42 && objectWorldMatrix[2][3] > -0.645 && objectWorldMatrix[2][3] < 0.645){
+    if (objectWorldMatrix[2][11] >= 0.42 && objectWorldMatrix[2][3] > -0.645 && objectWorldMatrix[2][3] < 0.645) {
+        playEdgeSound(); // Activate edge sound effect
         hz3 *= -1;
         hx3 *= 1;
     }
 
-    // goal
-    if(objectWorldMatrix[2][3] >= 0.9 && objectWorldMatrix[2][11] > -0.224 && objectWorldMatrix[2][11] < 0.224 ){
-        player1+=1;
+    // Goal
+    if (objectWorldMatrix[2][3] >= 0.9 && objectWorldMatrix[2][11] > -0.224 && objectWorldMatrix[2][11] < 0.224) {
+        player1 += 1;
         goal();
     }
-    if(objectWorldMatrix[2][3] <= -0.9 && objectWorldMatrix[2][11] > -0.224 && objectWorldMatrix[2][11] < 0.224 ){
-        player2+=1;
+    if (objectWorldMatrix[2][3] <= -0.9 && objectWorldMatrix[2][11] > -0.224 && objectWorldMatrix[2][11] < 0.224) {
+        player2 += 1;
         goal();
     }
 
     objectWorldMatrix[2] = utils.multiplyMatrices(objectWorldMatrix[2], utils.MakeTranslateMatrix(hx3, hy3, hz3));
 }
 
-
 function movement() {
-
     padsMove();
     padDiskImpact();
     diskTableImpact();
-
 }
-
-
 
 function drawScene() {
 
     utils.resizeCanvasToDisplaySize(gl.canvas);
 
+    // Update timer
+    clock += 1/60;
+    timer.textContent = clock.toFixed(2);   // 2 decimal places
+
     if (isAnimation) { animate(); }
 
-    movement();
+    movement(); // Handle movement of the objects
 
     computeMatrices();
 
@@ -1280,7 +1292,6 @@ function drawScene() {
 
         gl.uniform1f(materialSpecPowerHandle[currentShader], objectSpecularPower);
 
-
         gl.uniform3f(lightDirectionHandle[currentShader], lightDirectionObj[i][0],
             lightDirectionObj[i][1],
             lightDirectionObj[i][2]);
@@ -1289,6 +1300,7 @@ function drawScene() {
             lightPositionObj[i][2]);
 
         gl.uniform1i(lightTypeHandle[currentShader], currentLightType);
+        gl.uniform1i(specularReflectionHandle[currentShader], currentSpecularReflection);
 
         gl.uniform3f(eyePositionHandle[currentShader],	observerPositionObj[i][0],
             observerPositionObj[i][1],
@@ -1312,6 +1324,42 @@ function drawScene() {
         gl.disableVertexAttribArray(vertexNormalHandle[currentShader]);
     }
     window.requestAnimationFrame(drawScene);
+
+    // Showing the scores as small squares
+    const program = webglUtils.createProgramFromSources(gl, [vs, fs]);
+    const positionLoc = gl.getAttribLocation(program, 'position');
+    const colorLoc = gl.getUniformLocation(program, 'color');
+
+    gl.useProgram(program);
+
+    // Blue squares for player 1
+    if (player1 > 0) {
+        for (let i = 0; i < player1; ++i) {
+            const u = i / player1;
+            const clipspace = u * 1.6 - 0.8;  // -0.8 to +0.8
+            gl.vertexAttrib2f(positionLoc, clipspace, -0.8);
+
+            gl.uniform4f(colorLoc, 0, 0, 1, 1);
+
+            const offset = 0;
+            const count = 1;
+            gl.drawArrays(gl.POINTS, offset, count);
+        }
+    }
+    // Red squares for player 2
+    if (player2 > 0) {
+        for (let i = 0; i < player2; ++i) {
+            const u = i / player2;
+            const clipspace = u * 1.6 - 0.8;  // -0.8 to +0.8
+            gl.vertexAttrib2f(positionLoc, clipspace, 0.8);
+
+            gl.uniform4f(colorLoc, 1, 0, 0, 1);
+
+            const offset = 0;
+            const count = 1;
+            gl.drawArrays(gl.POINTS, offset, count);
+        }
+    }
 }
 
 function requestCORSIfNotSameOrigin(img, url) {
@@ -1320,40 +1368,44 @@ function requestCORSIfNotSameOrigin(img, url) {
     }
 }
 
-function subtractVectors(a, b) {
-    return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+function playHitSound() {
+    var audio = document.getElementById("hit");
+    audio.play();
 }
 
-function normalize(v) {
-    var length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-    // make sure we don't divide by 0.
-    if (length > 0.00001) {
-        return [v[0] / length, v[1] / length, v[2] / length];
-    } else {
-        return [0, 0, 0];
-    }
+function playGoalSound() {
+    var audio = document.getElementById("goal");
+    audio.play();
 }
 
-function cross(a, b) {
-    return [a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]];
+function playEdgeSound() {
+    var audio = document.getElementById("edge");
+    audio.play();
 }
 
-var m4 = {
-    lookAt: function(cameraPosition, target, up) {
-        var zAxis = normalize(
-            subtractVectors(cameraPosition, target));
-        var xAxis = normalize(cross(up, zAxis));
-        var yAxis = normalize(cross(zAxis, xAxis));
-        return [
-            xAxis[0], xAxis[1], xAxis[2], 0,
-            yAxis[0], yAxis[1], yAxis[2], 0,
-            zAxis[0], zAxis[1], zAxis[2], 0,
-            cameraPosition[0],
-            cameraPosition[1],
-            cameraPosition[2],
-            1,
-        ];
-    },
+const vs = `#version 300 es
+
+// vertex shader
+
+in vec4 position;
+
+void main() {
+  gl_Position = position;
+  gl_PointSize = 20.0;
+} 
+`;
+
+const fs = `#version 300 es
+
+// fragment shader
+
+precision mediump float;
+
+uniform vec4 color;
+
+out vec4 outColor;
+
+void main() {
+  outColor = color;
 }
+`;

@@ -1,3 +1,9 @@
+/*
+	Phong shading is implemented by computing the vertex position and normal directions in the vertex shader, 
+	and passing the resulting vectors to the fragment shader. 
+	The rendering equation is then solved per pixel in the fragment shader.
+*/
+
 precision highp float; 
 
 uniform vec4 mDiffColor;
@@ -13,6 +19,7 @@ uniform vec3 lightDirection;
 uniform vec3 lightPosition;
 uniform vec4 lightColor;
 uniform int lightType;
+uniform int specularReflection;
 
 uniform vec3 eyePosition;
 
@@ -35,15 +42,15 @@ vec4 lightModel(int lt, vec3 pos) {
 
 	lDim = 1.0;
 	
-	if (lt == 1) { 			//Directional light
+	if (lt == 1) { 			// Directional light
 		nLightDir = - normalize(lightDirection);
-	} else if (lt == 2) {	//Point light
+	} else if (lt == 2) {	// Point light
 		nLightDir = normalize(lightPosition - pos);
-	} else if (lt == 3) {	//Point light (decay)
+	} else if (lt == 3) {	// Point light (decay)
 		float lLen = length(lightPosition - pos);
 		nLightDir = normalize(lightPosition - pos);
 		lDim = 160.0 / (lLen * lLen);
-	} else if (lt == 4) {	//Spot light
+	} else if (lt == 4) {	// Spot light
 		nLightDir = normalize(lightPosition - pos);
 		lCone = -dot(nLightDir, normalize(lightDirection));
 		if(lCone < 0.5) {
@@ -83,11 +90,19 @@ void main() {
 		// Computing the diffuse component of light 
 		vec4 diffuse = diffuseTextureColorMixture * lightColor * clamp(dot(nlightDirection, nNormal), 0.0, 1.0) * lightDimension;	
 		
-		// Reflection vector for Phong model
-		vec3 reflection = -reflect(nlightDirection, nNormal);	
-		vec4 specular = mSpecColor * lightColor * pow(clamp(dot(reflection, nEyeDirection),0.0, 1.0), mSpecPower) * lightDimension;
+		vec4 specular;
+
+		if (specularReflection == 1) {
+			// Reflection vector for Phong model
+			// reflect() --> For a given incident vector I and surface normal N reflect returns the reflection direction calculated as I - 2.0 * dot(N, I) * N.
+			vec3 reflection = -reflect(nlightDirection, nNormal); 
+			specular = mSpecColor * lightColor * pow(clamp(dot(reflection, nEyeDirection), 0.0, 1.0), mSpecPower) * lightDimension;
+		} else if (specularReflection == 0) {
+			// Reflection vector for Blinn model
+			vec3 hVec = normalize(nEyeDirection + nlightDirection);
+			specular = mSpecColor * lightColor * pow(clamp(dot(nNormal, hVec), 0.0, 1.0), mSpecPower) * lightDimension;
+		}
+
 		gl_FragColor = min(ambLight + diffuse + specular, vec4(1.0, 1.0, 1.0, 1.0)); 		
 	}
-	
-
 }

@@ -1,3 +1,8 @@
+/*
+	Gouraud shading is implemented by computing the solution of the rendering equation per vertex, 
+	and passing the resulting color to the next stage.
+*/
+
 precision highp float; 
 
 uniform sampler2D textureFile;

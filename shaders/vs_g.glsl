@@ -1,3 +1,8 @@
+/*
+	Gouraud shading is implemented by computing the solution of the rendering equation per vertex, 
+	and passing the resulting color to the next stage.
+*/
+
 attribute vec3 inPosition; 
 attribute vec3 inNormal; 
 attribute vec2 inUVs;
@@ -12,6 +17,7 @@ uniform vec3 lightDirection;
 uniform vec3 lightPosition;
 uniform vec4 lightColor;
 uniform int lightType;
+uniform int specularReflection;
 
 uniform vec4 ambientLightColor;
 uniform float ambientLightInfluence;
@@ -80,9 +86,18 @@ void main() {
 		// Computing the diffuse component of light (Without the texture contribution)
 		vec4 diffuse = lightColor * clamp(dot(nlightDirection, nNormal), 0.0, 1.0) * lightDimension;	
 		
-		// Reflection vector for Phong model
-		vec3 reflection = -reflect(nlightDirection, nNormal);	
-		vec4 specular = mSpecColor * lightColor * pow(clamp(dot(reflection, nEyeDirection),0.0, 1.0), mSpecPower) * lightDimension;
+		vec4 specular;
+
+		if (specularReflection == 1) {
+			// Reflection vector for Phong model
+			// reflect() --> For a given incident vector I and surface normal N reflect returns the reflection direction calculated as I - 2.0 * dot(N, I) * N.
+			vec3 reflection = -reflect(nlightDirection, nNormal); 
+			specular = mSpecColor * lightColor * pow(clamp(dot(reflection, nEyeDirection), 0.0, 1.0), mSpecPower) * lightDimension;
+		} else if (specularReflection == 0) {
+			// Reflection vector for Blinn model
+			vec3 hVec = normalize(nEyeDirection + nlightDirection);
+			specular = mSpecColor * lightColor * pow(clamp(dot(nNormal, hVec), 0.0, 1.0), mSpecPower) * lightDimension;
+		}
 			
 		goureaudSpecular = specular;
 		goureaudDiffuseAndAmbient = diffuse + ambLight;

@@ -5,6 +5,7 @@
 	<title>Air Hockey</title>
 	<script type="text/javascript" src="utils.js"></script>
 	<script type="text/javascript" src="webgl-lessons-ui.js"></script>
+	<script type = "text/javascript" src="webgl-utils.js"></script>
 	<script type="text/javascript" src="drawing.js"></script>
 
 	<style>
@@ -12,6 +13,7 @@
 		body {
 			border: 0;
 			background-color: white;
+			overflow: hidden;
 		}
 		/* make the canvas the size of the viewport */
 		canvas {
@@ -20,6 +22,18 @@
 		}
 		#options {
 			float: left;
+		}
+		#overlay {
+			position: absolute;
+			right: 30px;
+			top: 10px;
+			background-color: rgba(0, 0, 0, 0.7);
+			color: white;
+			font-family: monospace;
+			padding: 1em;
+			border-radius: 1em;
+			border: 5px solid #f00;
+			text-shadow: 0px 0px 5px white, 0px 0px 5px white, 0px 0px 5px white, 0px 0px 5px white;
 		}
 	</style>
 
@@ -30,11 +44,18 @@
 		<canvas id="c">
 			Your browser does not support the HTML5 canvas element.
 		</canvas>
+		<div id="overlay">
+			<div>Time: <span id="time"></span></div>
+		</div>
+
+		<audio id="hit" src="audio/hit.ogg" ></audio>
+		<audio id="goal" src="audio/goal.ogg" ></audio>
+		<audio id="edge" src="audio/edge.ogg" ></audio>
 
 		<table id="options">
 		<tr>
 			<td style="background-color: white; font-family: courier; padding: 5px;">
-			<button name="reset" onclick="reset()">Reset</button>
+			<!--<button name="reset" onclick="reset()">Reset</button>-->
 			<p><h2> Options </h2></p>
 			<p><b> Camera View </b></p>
 			<button name="front" value="0" onclick="updateCamera(this.value)">FRONT</button>
@@ -58,6 +79,10 @@
 			<form>
 				<input type="radio" name="type" onchange="updateShader(this.value);" value="1" > Per Vertex <br/>
 				<input type="radio" name="type" onchange="updateShader(this.value);" value="0" checked> Per Fragment <br/>
+			</form>	
+			<form>
+				<input type="radio" name="type" onchange="updateSpecRefl(this.value);" value="1" checked> Phong <br/>
+				<input type="radio" name="type" onchange="updateSpecRefl(this.value);" value="0" > Blinn <br/>
 			</form>			
 			<p><b> Texture Influence </b></p>
 			<div id="slider1"> 0 
@@ -71,10 +96,6 @@
 				<input id="colorPicker" type="color" value="#FFFFFF" onchange="updateAmbientLightColor(this.value);"/>
 				</p>
 			</div>
-			
-			<p><b> Movement </b></p>
-				<input type="checkbox" id="chbx" onclick="updateLightMovement();"/> Move Lights<br/>
-			</td>
 		<tr>
 		</table>
 	</body>
