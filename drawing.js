@@ -67,10 +67,6 @@ var FOV = 2; // Field Of View
 
 var delta = 2.0;
 
-// Timer of the game
-var clock = 0.0;
-var timer;
-
 // Parameters for handles & disk
 var speedHandleLeftRight = 0.015;
 var speedHandleUpDown = 0.015;
@@ -142,8 +138,6 @@ function main() {
 
         // Setting up the interaction using keys (we use this to move the paddles)
         initInteraction();
-
-        timer = document.getElementById("time");
 
         // Rendering cycle
         drawScene();
@@ -463,6 +457,14 @@ function scaleObjects() {
         objectWorldMatrix[i],
         utils.MakeScaleMatrix(scaleValue));
 }
+
+// Block the scrolling event with arrow keys
+window.addEventListener("keydown", function(e) {
+    // space and arrow keys
+    if([32, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+        e.preventDefault();
+    }
+}, false);
 
 var pressed = true; // Used to move the paddles
 
@@ -1246,10 +1248,6 @@ function drawScene() {
 
     utils.resizeCanvasToDisplaySize(gl.canvas);
 
-    // Update timer
-    clock += 1/60;
-    timer.textContent = clock.toFixed(2);   // 2 decimal places
-
     if (isAnimation) { animate(); }
 
     movement(); // Handle movement of the objects
@@ -1337,7 +1335,7 @@ function drawScene() {
         for (let i = 0; i < player1; ++i) {
             const u = i / player1;
             const clipspace = u * 1.6 - 0.8;  // -0.8 to +0.8
-            gl.vertexAttrib2f(positionLoc, clipspace, -0.8);
+            gl.vertexAttrib2f(positionLoc, -0.8, clipspace);
 
             gl.uniform4f(colorLoc, 0, 0, 1, 1);
 
@@ -1351,7 +1349,7 @@ function drawScene() {
         for (let i = 0; i < player2; ++i) {
             const u = i / player2;
             const clipspace = u * 1.6 - 0.8;  // -0.8 to +0.8
-            gl.vertexAttrib2f(positionLoc, clipspace, 0.8);
+            gl.vertexAttrib2f(positionLoc, 0.8, clipspace);
 
             gl.uniform4f(colorLoc, 1, 0, 0, 1);
 
