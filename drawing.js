@@ -63,7 +63,7 @@ var cy = 13.0;
 var cz = 36.0;
 var angle = -17;
 var elevation = -20;
-var FOV = 2; // Field Of View
+var FOV = 9; // Field Of View
 
 var delta = 2.0;
 
@@ -149,7 +149,7 @@ function main() {
         webglLessonsUI.setupSlider("#cameraElevation", {value: cameraElevation, slide: updateCameraElevation, min: -180, max: 180, precision: 2, step: 0.001});
 
         // Setup slider for the field of view (FOV)
-        webglLessonsUI.setupSlider("#fieldOfView", {value: cameraFOV, slide: updateFOV, min: -10, max: 10, precision: 2, step: 0.001});
+        webglLessonsUI.setupSlider("#fieldOfView", {value: cameraFOV, slide: updateFOV, min: 3, max: 20, precision: 2, step: 0.001});
 
     } else {
         alert("Error: Your browser does not appear to support WebGL.");
@@ -159,7 +159,7 @@ function main() {
 // Default values for sliders
 var cameraAngleDeg = 90;
 var cameraElevation = -20;
-var cameraFOV = 2;
+var cameraFOV = 9;
 
 // Function for the angle slider
 function updateCameraAngle(event, ui) {
@@ -567,7 +567,7 @@ function computeMatrices() {
 	*/
     var cameraMatrix = utils.MakeRotateYMatrix(cameraAngleDeg);
     cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeRotateXMatrix(cameraElevation));
-    cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeTranslateMatrix(0, 0, 50));
+    cameraMatrix = utils.multiplyMatrices(cameraMatrix, utils.MakeTranslateMatrix(0, 0, 10));
 
     /*
 		If we apply the inverse of Mc to all the objects in the scene, we obtain a new 3D world where the projection plane is parallel to the
@@ -1114,7 +1114,7 @@ function diskTableImpact() {
                 hx3 = speedDisk * -1;
                 hz3 = speedDisk * 0.5;
             }
-            if( ( objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && (objectWorldMatrix[2][11] >=-0.2 * s50  - 0.225))
+            if( ( objectWorldMatrix[2][11] <= -0.2 * s40  - 0.225) && (objectWorldMatrix[2][11] > -0.2 * s50  - 0.225))
             {
                 resetValues3();
                 hx3 -= speedDisk;
@@ -1214,12 +1214,12 @@ function diskTableImpact() {
     }
 
     // Disk - table left & right
-    if (objectWorldMatrix[2][11] <= -0.42  && objectWorldMatrix[2][3] > - 0.645 && objectWorldMatrix[2][3] < 0.645) {
+    if (objectWorldMatrix[2][11] <= -0.42  && objectWorldMatrix[2][3] > - 0.645 && objectWorldMatrix[2][3] < 0.645 && hz3 < 0) {
         playEdgeSound(); // Activate edge sound effect
         hz3 *= -1;
         hx3 *= 1;
     }
-    if (objectWorldMatrix[2][11] >= 0.42 && objectWorldMatrix[2][3] > -0.645 && objectWorldMatrix[2][3] < 0.645) {
+    if (objectWorldMatrix[2][11] >= 0.42 && objectWorldMatrix[2][3] > -0.645 && objectWorldMatrix[2][3] < 0.645 && hz3 > 0) {
         playEdgeSound(); // Activate edge sound effect
         hz3 *= -1;
         hx3 *= 1;
